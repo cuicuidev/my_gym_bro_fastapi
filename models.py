@@ -16,7 +16,7 @@ class Exercise(Base):
 class ExerciseType(Base):
     __tablename__: str = 'exercise_type'
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String)
+    type = Column(String)
 
 class User(Base):
     __tablename__: str = 'user'
@@ -44,13 +44,12 @@ class Set(Base):
     exercise_id = Column(Integer, ForeignKey('exercise.id'))
     exercise = relationship('Exercise')
 
-    parent_superset_id = Column(Integer, ForeignKey('set.id'))
-    parent_superset = relationship('Entry')
-    child_superset_id = Column(Integer, ForeignKey('set.id'))
-    child_superset = relationship('Entry')
+    previous_set_id = Column(Integer, ForeignKey('set.id'))
+    previous_set = relationship('Set', foreign_keys=[previous_set_id], remote_side=[id])
+
+    next_set_id = Column(Integer, ForeignKey('set.id'))
+    next_set = relationship('Set', foreign_keys=[next_set_id], remote_side=[id])
 
     time_created = Column(DateTime(timezone=True), server_default=func.now())
     time_updated = Column(DateTime(timezone=True), onupdate=func.now())
     active = Column(Boolean)
-
-    #squats - rest - squats - rest - squats - rest - rdl - rest - rdl
