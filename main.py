@@ -1,30 +1,34 @@
-import uvicorn
-import os, sys
-from dotenv import load_dotenv
-from fastapi import FastAPI
-from fastapi_sqlalchemy import DBSessionMiddleware, db
+from fastapi import FastAPI, Depends, HTTPException, status, Response
 
-from schema import Set as SchemaSet
-from schema import User as SchemaUser
+from models import Set
 
-from models import Set as ModelSet
-from models import User as ModelUser
+from database import Set as DBSet
+from database import User as DBUser
+from database import get_db
+from sqlalchemy.orm import Session
+
+from auth import oauth2_scheme, router
 
 app = FastAPI()
 
-
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-load_dotenv(os.path.join(BASE_DIR, "./app/.env"))
-sys.path.append(BASE_DIR)
-
-app.add_middleware(DBSessionMiddleware, db_url = os.environ["POSTGRES_URL"])
+app.include_router(router=router)
 
 @app.get('/')
 async def root():
     return "Hello World!"
 
-@app.post('/post_set/', response_model=SchemaSet)
-async def post_set(set: SchemaSet) -> SchemaSet:
+############################################################## SET ENTRIES ##############################################################
+
+@app.get('/get_set/{id}')
+async def get_set(id: int, token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    user_id = 6 #get_uuid_from_token(token)
+    db_set = db.query(DBSet).filter(DBSet.id == id).filter(DBSet.user_id == user_id).first()
+    if db_set is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Not Found. User.id = {user_id}. Set.id = {id}.")
+    return db_set
+
+@app.post('/post_set/')
+async def post_set(set: Set, token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     unix_timestamp_ms = set.unix_timestamp_ms
     weight_kg = set.weight_kg
     n_repetitions = set.n_repetitions
@@ -37,7 +41,7 @@ async def post_set(set: SchemaSet) -> SchemaSet:
     next_set_id = set.next_set_id
     active = True
     
-    db_set = ModelSet(
+    db_set = DBSet(
         unix_timestamp_ms = unix_timestamp_ms,
         weight_kg = weight_kg,
         n_repetitions = n_repetitions,
@@ -51,24 +55,60 @@ async def post_set(set: SchemaSet) -> SchemaSet:
         active = active
     )
 
-    db.session.add(db_set)
-    db.session.commit()
+    db.add(db_set)
+    db.commit()
+    return Response(content="CREATED", status_code=status.HTTP_201_CREATED)
 
-    return db_set
+@app.put('/put_set/{id}')
+async def put_set(id: int, updated_set: Set, token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    user_id = 6
+    existing_set = db.query(DBSet).filter(DBSet.id == id).filter(DBSet.user_id == user_id).first()
 
-@app.post('/sign_up/', response_model=SchemaUser)
-async def sign_up(user: SchemaUser) -> SchemaUser:
-    username = user.username
-    email = user.email
-    active = True
+    if existing_set is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Not Found. User.id = {user_id}. Set.id = {id}.")
+    
+    existing_set.unix_timestamp_ms = updated_set.unix_timestamp_ms
+    existing_set.unix_timestamp_ms = updated_set.unix_timestamp_ms
+    existing_set.weight_kg = updated_set.weight_kg
+    existing_set.n_repetitions = updated_set.n_repetitions
+    existing_set.rir = updated_set.rir
+    existing_set.duration_ms = updated_set.duration_ms
+    existing_set.tir_ms = updated_set.tir_ms
+    existing_set.user_id = updated_set.user_id
+    existing_set.exercise_id = updated_set.exercise_id
+    existing_set.previous_set_id = updated_set.previous_set_id
+    existing_set.next_set_id = updated_set.next_set_id
 
-    db_user = ModelUser(
-        username = username,
-        email = email,
-        active = active
-    )
+    db.commit()
 
-    db.session.add(db_user)
-    db.session.commit()
+    return Response(content="UPDATED", status_code=status.HTTP_202_ACCEPTED)
 
-    return db_user
+@app.delete('/delete_set/{id}')
+async def delete_set(id: int, token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    user_id = 6
+    existing_set = db.query(DBSet).filter(DBSet.id == id).filter(DBSet.user_id == user_id).first()
+
+    if existing_set is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Not Found. User.id = {user_id}. Set.id = {id}.")
+    
+    existing_set.active = False
+
+    db.commit()
+
+    return Response(content="DELETED", status_code=status.HTTP_202_ACCEPTED)
+
+@app.delete('/delete_set/{id}/hard')
+async def hard_delete_set(id: int, token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    user_id = 6
+    existing_set = db.query(DBSet).filter(DBSet.id == id).filter(DBSet.user_id == user_id).first()
+
+    if existing_set is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Not Found. User.id = {user_id}. Set.id = {id}.")
+    
+    db.delete(existing_set)
+    db.commit()
+
+    return Response(content="ERASED", status_code=status.HTTP_202_ACCEPTED)
+
+
+############################################################## SOMETHING ELSE ##############################################################

@@ -21,9 +21,9 @@ if config.config_file_name is not None:
 
 target_metadata = None
 
-import models
+import database
 
-target_metadata = models.Base.metadata
+target_metadata = database.Base.metadata
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode.
