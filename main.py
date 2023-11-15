@@ -7,7 +7,7 @@ from database import User as DBUser
 from database import get_db
 from sqlalchemy.orm import Session
 
-from auth import oauth2_scheme, router
+from auth import get_user, oauth2_scheme, router, verify_token
 
 app = FastAPI()
 
@@ -21,10 +21,17 @@ async def root():
 
 @app.get('/get_set/{id}')
 async def get_set(id: int, token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
-    user_id = 6 #get_uuid_from_token(token)
+    payload = verify_token(token)
+    username = payload['sub']
+    user = get_user(db, username)
+    if user:
+        user_id = user.id
+    else:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="user {username=} does not exist")
+    
     db_set = db.query(DBSet).filter(DBSet.id == id).filter(DBSet.user_id == user_id).first()
     if db_set is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Not Found. User.id = {user_id}. Set.id = {id}.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Not Found. {username=}. {id=}.")
     return db_set
 
 @app.post('/post_set/')

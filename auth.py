@@ -22,14 +22,8 @@ SECRET_KEY = os.environ["SECRET_KEY"]
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
-class Token(BaseModel):
-    access_token: str
-    token_type: str
-
-class TokenData(BaseModel):
-    username: str | None = None
-
 class User(BaseModel):
+    id: int
     username: str
     email: str | None = None
     full_name: str | None = None
@@ -112,21 +106,21 @@ def authenticate_user(db, username: str, password: str):
     
     return user
 
-def create_token(data: UserInDB, time_to_expire: datetime | None = None):
-    data_dict = data.model_dump()
+def create_token(data: dict, time_to_expire: datetime | None = None):
+    data_dict = data
     if time_to_expire is None:
         expires = datetime.utcnow() + timedelta(minutes=15)
     else:
         expires = datetime.utcnow() + time_to_expire
     
-    data_dict.update("exp", expires)
+    data_dict.update({"exp": expires})
     token = jwt.encode(data_dict, key=SECRET_KEY, algorithm=ALGORITHM)
     return token
     
 def get_current_user(token: Annotated[str, Depends(oauth2_scheme)], db: Session = Depends(get_db)):
     try:
-        user_dict = jwt.decode(token=token, key=SECRET_KEY, algorithms=[ALGORITHM])
-        username = user_dict.get("sub")
+        payload = jwt.decode(token=token, key=SECRET_KEY, algorithms=[ALGORITHM])
+        username = payload.get("sub")
         if username is None:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="null username", headers={"WWW-Authenticate" : "Bearer"})
     except JWTError as err:
@@ -140,7 +134,13 @@ def get_current_user(token: Annotated[str, Depends(oauth2_scheme)], db: Session 
 async def get_current_active_user(
     current_user: Annotated[User, Depends(get_current_user)]
 ):
-    if current_user.disabled:
+    if ~current_user.active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="inactive user")
     return current_user
 
+def verify_token(token: str) -> dict:
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload
+    except JWTError as err:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=err, headers={"WWW-Authenticate" : "Bearer"})
