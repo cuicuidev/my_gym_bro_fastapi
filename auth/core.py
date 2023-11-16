@@ -29,10 +29,11 @@ sys.path.append(BASE_DIR)
 SECRET_KEY = os.environ["SECRET_KEY"]
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
+REFRESH_TOKEN_EXPIRE_DAYS = 90
 
 pwd_content = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token/")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
 
 def verify_password(plain_password, hashed_password):
     return pwd_content.verify(plain_password, hashed_password)
@@ -52,7 +53,7 @@ def authenticate_user(db, username: str, password: str):
     
     return user
 
-def create_token(data: dict, time_to_expire: datetime | None = None):
+def create_access_token(data: dict, time_to_expire: datetime | None = None):
     data_dict = data
     if time_to_expire is None:
         expires = datetime.utcnow() + timedelta(minutes=15)
@@ -84,7 +85,7 @@ async def get_current_active_user(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="inactive user")
     return current_user
 
-def verify_token(token: str) -> dict:
+def verify_access_token(token: str) -> dict:
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         return payload
@@ -92,5 +93,5 @@ def verify_token(token: str) -> dict:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=err, headers={"WWW-Authenticate" : "Bearer"})
 
 def get_user_id_from_token(token: str) -> int:
-    payload = verify_token(token)
+    payload = verify_access_token(token)
     return payload['user_id']
