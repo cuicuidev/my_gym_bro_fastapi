@@ -21,7 +21,7 @@ if config.config_file_name is not None:
 
 target_metadata = None
 
-import database
+import core.database as database
 
 target_metadata = database.Base.metadata
 

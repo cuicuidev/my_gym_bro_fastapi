@@ -2,9 +2,9 @@ from fastapi.testclient import TestClient
 import pytest
 from sqlalchemy import create_engine, StaticPool
 from sqlalchemy.orm import sessionmaker
-from database import Base, get_db, Set
-from schemas import Set as SchemaSet
-from schemas import User as SchemaUser
+from core.database import Base, get_db, Set
+import auth
+import sets
 from datetime import datetime, timedelta
 
 from main import app
@@ -42,7 +42,7 @@ client = TestClient(app) # Client to make http requests to the api endpoints
 def create_set_data(user_id: int):
     session = TestingSessionLocal()
 
-    user_existing_set_schema = SchemaSet(
+    user_existing_set_schema = sets.schemas.Set(
         unix_timestamp_ms=datetime.now().timestamp(),
 
         weight_kg=50.0,
@@ -113,7 +113,7 @@ def test_get_set_authenticated_valid_set(setup_mock_data):
     # <SETUP>
 
     response = client.get(
-        f"/get_set/{users_existing_set_id}",
+        f"/sets/get/{users_existing_set_id}",
         headers={"Authorization": f"Bearer {token}"}
     )
     assert response.status_code == 200, f"Status code should be 200 for an existing set. Result: {response.status_code=}"
@@ -126,7 +126,7 @@ def test_get_set_authenticated_set_does_not_exist(setup_mock_data):
     # <SETUP>
 
     response = client.get(
-        f"/get_set/{non_existing_set_id}",
+        f"/sets/get/{non_existing_set_id}",
         headers={"Authorization": f"Bearer {token}"}
     )
     assert response.status_code == 404, f"Status code should be 404 for a non-existing set. Result: {response.status_code=}"
@@ -138,13 +138,13 @@ def test_get_set_authenticated_set_belongs_to_another_user(setup_mock_data):
     # <SETUP>
 
     response = client.get(
-        f"/get_set/{another_users_existing_set_id}",
+        f"/sets/get/{another_users_existing_set_id}",
         headers={"Authorization": f"Bearer {token}"}
     )
     assert response.status_code == 403, f"Status code should be 403 if the set belongs to another user. Result: {response.status_code=}"
 
 def test_get_set_not_authenticated(setup_mock_data):
-    response = client.get("/get_set/{existing_id}")
+    response = client.get("sets/get/{existing_id}")
     assert response.status_code == 401, f"Status code should be 401 for unauthenticated requests. Result: {response.status_code=}"
 
 
