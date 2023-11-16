@@ -1,18 +1,28 @@
+# modules
 import os, sys
-from dotenv import load_dotenv
+
 from datetime import datetime, timedelta
 from typing import Annotated
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+
+# database
 from sqlalchemy.orm import Session
-from starlette import status
-from database import User
+from database import User as DBUser
+from database import get_db
+
+# security
+from dotenv import load_dotenv
 from passlib.context import CryptContext
 from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 from jose import jwt, JWTError
 
-from database import User as DBUser
-from database import get_db
+# api
+from fastapi import APIRouter, Depends, HTTPException
+from starlette import status
+
+# schemas
+from schemas import User, UserInDB, SignUpForm
+
+
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 load_dotenv(os.path.join(BASE_DIR, "./app/.env"))
@@ -21,21 +31,6 @@ sys.path.append(BASE_DIR)
 SECRET_KEY = os.environ["SECRET_KEY"]
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
-
-class User(BaseModel):
-    id: int
-    username: str
-    email: str | None = None
-    full_name: str | None = None
-    active: bool | None = None
-
-class UserInDB(User):
-    password: str
-
-class SignUpForm(User):
-    password: str
-    confirm_password: str
-
 
 pwd_content = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -144,3 +139,7 @@ def verify_token(token: str) -> dict:
         return payload
     except JWTError as err:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=err, headers={"WWW-Authenticate" : "Bearer"})
+
+def get_user_id_from_token(token: str) -> int:
+    payload = verify_token(token)
+    return payload['user_id']

@@ -1,9 +1,11 @@
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Float, Boolean, create_engine
-from sqlalchemy.orm import relationship, sessionmaker, declarative_base
+from sqlalchemy.orm import relationship, sessionmaker, declarative_base, Session
 from sqlalchemy.sql import func
 
 from dotenv import load_dotenv
 import sys, os
+
+import schemas
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 load_dotenv(os.path.join(BASE_DIR, "./app/.env"))
@@ -87,3 +89,32 @@ class Set(Base):
     time_created = Column(DateTime(timezone=True), server_default=func.now())
     time_updated = Column(DateTime(timezone=True), onupdate=func.now())
     active = Column(Boolean)
+
+def create_set(db: Session, set_data: schemas.Set, user_id: int):
+    db_set = Set(**set_data.model_dump(), user_id=user_id, active=True)
+    db.add(db_set)
+    db.commit()
+    db.refresh(db_set)
+    return db_set
+
+def read_set(db: Session, id: int):
+    db_set = db.query(Set).filter(Set.id == id).first()
+    return db_set
+
+def update_set(db: Session, existing_set: Set, updated_set: schemas.Set):
+    for key, value in updated_set.model_dump().items():
+        setattr(existing_set, key, value)
+
+    db.commit()
+    db.refresh(existing_set)
+    return existing_set
+
+def delete_set_(db: Session, existing_set: Set):
+    existing_set.active = False
+    db.commit()
+    db.refresh(existing_set)
+    return existing_set
+
+def delete_set_hard_(db: Session, existing_set: Set):
+    db.delete(existing_set)
+    db.commit()
