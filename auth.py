@@ -50,7 +50,7 @@ router = APIRouter(
 async def post_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = authenticate_user(db, form_data.username, form_data.password)
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_token({"sub" : user.username}, access_token_expires)
+    access_token = create_token({"username" : user.username, "user_id" : user.id}, access_token_expires)
     return {
         "access_token" : access_token,
         "token_type" : "bearer"
@@ -120,7 +120,7 @@ def create_token(data: dict, time_to_expire: datetime | None = None):
 def get_current_user(token: Annotated[str, Depends(oauth2_scheme)], db: Session = Depends(get_db)):
     try:
         payload = jwt.decode(token=token, key=SECRET_KEY, algorithms=[ALGORITHM])
-        username = payload.get("sub")
+        username = payload.get("username")
         if username is None:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="null username", headers={"WWW-Authenticate" : "Bearer"})
     except JWTError as err:
